@@ -1,0 +1,119 @@
+# Grafana datasources configuration for Qdrant Neo4j Crawl4AI MCP Server
+# Automated provisioning of data sources for monitoring stack
+
+apiVersion: 1
+
+datasources:
+  # Prometheus datasource for metrics
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      httpMethod: POST
+      manageAlerts: true
+      prometheusType: Prometheus
+      prometheusVersion: 2.48.0
+      cacheLevel: 'High'
+      incrementalQuerying: true
+      incrementalQueryOverlapWindow: 10m
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: jaeger
+          urlDisplayLabel: "View in Jaeger"
+    secureJsonData: {}
+
+  # Loki datasource for logs
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: true
+    jsonData:
+      maxLines: 1000
+      derivedFields:
+        - name: "TraceID"
+          matcherRegex: "trace_id=([a-f0-9]+)"
+          url: "$${__value.raw}"
+          datasourceUid: jaeger
+          urlDisplayLabel: "View in Jaeger"
+      alertmanager:
+        handleGrafanaManagedAlerts: true
+        implementation: prometheus
+    secureJsonData: {}
+
+  # Jaeger datasource for distributed tracing
+  - name: Jaeger
+    type: jaeger
+    access: proxy
+    url: http://jaeger:16686
+    editable: true
+    uid: jaeger
+    jsonData:
+      tracesToLogs:
+        datasourceUid: loki
+        tags: ['job', 'instance', 'pod', 'namespace']
+        mappedTags: [{ key: 'service.name', value: 'service' }]
+        mapTagNamesEnabled: true
+        spanStartTimeShift: '1h'
+        spanEndTimeShift: '1h'
+        filterByTraceID: false
+        filterBySpanID: false
+      nodeGraph:
+        enabled: true
+      spanBar:
+        type: Tag
+        tag: http.status_code
+    secureJsonData: {}
+
+  # Redis datasource for cache monitoring
+  - name: Redis
+    type: redis-datasource
+    access: proxy
+    url: redis://redis:6379
+    editable: true
+    jsonData:
+      client: standalone
+      poolSize: 5
+      timeout: 10
+      pingInterval: 0
+      pipelineWindow: 0
+    secureJsonData:
+      password: ""
+
+  # Neo4j datasource for graph database monitoring
+  - name: Neo4j
+    type: neo4j-datasource
+    access: proxy
+    url: bolt://neo4j:7687
+    editable: true
+    database: neo4j
+    basicAuth: true
+    basicAuthUser: neo4j
+    secureJsonData:
+      basicAuthPassword: ${NEO4J_PASSWORD}
+    jsonData:
+      access: proxy
+      database: neo4j
+      encrypted: false
+      serverVersion: "5.15"
+
+  # TestData datasource for testing and demos
+  - name: TestData
+    type: testdata
+    access: proxy
+    editable: false
+    jsonData: {}
+
+  # Mixed datasource for combining multiple sources
+  - name: Mixed
+    type: mixed
+    access: proxy
+    editable: false
+    jsonData: {}
+
+deleteDatasources:
+  - name: Graphite
+    orgId: 1

@@ -1,0 +1,158 @@
+# Loki configuration for Qdrant Neo4j Crawl4AI MCP Server
+# Log aggregation and querying for development environment
+
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+  log_level: info
+  log_format: logfmt
+
+common:
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: inmemory
+
+query_range:
+  results_cache:
+    cache:
+      embedded_cache:
+        enabled: true
+        max_size_mb: 100
+
+schema_config:
+  configs:
+    - from: 2020-10-24
+      store: boltdb-shipper
+      object_store: filesystem
+      schema: v11
+      index:
+        prefix: index_
+        period: 24h
+
+ruler:
+  alertmanager_url: http://alertmanager:9093
+
+# By default, Loki will send anonymous, but uniquely-identifiable usage and configuration
+# analytics to Grafana Labs. These statistics are sent to https://stats.grafana.org/
+#
+# Statistics help us better understand how Loki is used, and they show us performance
+# levels for most users. This helps us prioritize features and documentation.
+# For more information on what's sent: https://github.com/grafana/loki/blob/main/docs/sources/configuration/telemetry.md
+# Refer to the buildReport method to see what goes into a report.
+#
+# If you would like to disable reporting, uncomment the following lines:
+analytics:
+  reporting_enabled: false
+
+limits_config:
+  # Global limits
+  ingestion_rate_mb: 16
+  ingestion_burst_size_mb: 32
+  max_concurrent_tail_requests: 20
+  max_query_parallelism: 32
+  max_streams_per_user: 10000
+  max_line_size: 256000
+  max_label_name_length: 1024
+  max_label_value_length: 4096
+  max_label_names_per_series: 30
+  
+  # Per-tenant limits
+  per_stream_rate_limit: 3MB
+  per_stream_rate_limit_burst: 15MB
+  
+  # Query limits
+  max_entries_limit_per_query: 5000
+  max_global_streams_per_user: 5000
+  max_chunks_per_query: 2000000
+  max_query_length: 720h
+  max_query_parallelism: 32
+  
+  # Retention
+  retention_period: 744h  # 31 days
+
+# Table manager for retention
+table_manager:
+  retention_deletes_enabled: true
+  retention_period: 744h
+
+compactor:
+  working_directory: /loki/boltdb-shipper-compactor
+  shared_store: filesystem
+  compaction_interval: 10m
+  retention_enabled: true
+  retention_delete_delay: 2h
+  retention_delete_worker_count: 150
+
+ingester:
+  # Lifecycler configuration
+  lifecycler:
+    address: 127.0.0.1
+    ring:
+      kvstore:
+        store: inmemory
+      replication_factor: 1
+    final_sleep: 0s
+  
+  # Chunk configuration
+  chunk_idle_period: 5m
+  chunk_retain_period: 30s
+  max_chunk_age: 1h
+  chunk_target_size: 1048576
+  chunk_encoding: snappy
+  
+  # WAL configuration
+  wal:
+    enabled: true
+    dir: /loki/wal
+    checkpoint_duration: 5m
+    flush_on_shutdown: true
+
+distributor:
+  ring:
+    kvstore:
+      store: inmemory
+
+frontend:
+  max_outstanding_per_tenant: 256
+  compress_responses: true
+  downstream_url: http://127.0.0.1:3100
+
+frontend_worker:
+  frontend_address: 127.0.0.1:9095
+  grpc_client_config:
+    max_send_msg_size: 104857600
+
+query_scheduler:
+  max_outstanding_requests_per_tenant: 256
+
+querier:
+  query_ingesters_within: 3h
+  query_timeout: 1m
+  tail_max_duration: 1h
+  extra_query_delay: 0s
+
+storage_config:
+  boltdb_shipper:
+    active_index_directory: /loki/boltdb-shipper-active
+    cache_location: /loki/boltdb-shipper-cache
+    cache_ttl: 24h
+    shared_store: filesystem
+  filesystem:
+    directory: /loki/chunks
+
+chunk_store_config:
+  max_look_back_period: 0s
+
+# Memberlist configuration for clustering (disabled in single-node setup)
+memberlist:
+  join_members: []
+  bind_port: 7946

@@ -1,0 +1,250 @@
+# Promtail configuration for Qdrant Neo4j Crawl4AI MCP Server
+# Log shipping and processing for development environment
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: info
+  log_format: logfmt
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    batchwait: 1s
+    batchsize: 1048576
+    timeout: 10s
+    backoff_config:
+      min_period: 500ms
+      max_period: 5m
+      max_retries: 10
+    external_labels:
+      environment: development
+      cluster: qdrant-neo4j-crawl4ai-mcp
+
+positions:
+  filename: /tmp/positions.yaml
+
+scrape_configs:
+  # Application logs from qdrant-neo4j-crawl4ai-mcp
+  - job_name: qdrant-neo4j-crawl4ai-mcp
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: qdrant-neo4j-crawl4ai-mcp
+          service: qdrant-neo4j-crawl4ai-mcp
+          environment: development
+          __path__: /var/log/qdrant-neo4j-crawl4ai-mcp/*.log
+    pipeline_stages:
+      # Parse JSON logs
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            message: message
+            module: module
+            trace_id: trace_id
+            span_id: span_id
+            user_id: user_id
+      
+      # Extract timestamp
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      
+      # Add labels based on log level
+      - labels:
+          level:
+          module:
+          trace_id:
+          span_id:
+      
+      # Drop debug logs in production
+      - drop:
+          source: level
+          expression: "DEBUG"
+          older_than: 24h
+      
+      # Parse structured fields
+      - regex:
+          expression: '(?P<request_id>req_[a-zA-Z0-9]+)'
+          source: message
+      
+      - labels:
+          request_id:
+
+  # System logs
+  - job_name: system
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: system
+          service: system
+          environment: development
+          __path__: /var/log/{messages,syslog}
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\w+\s+\d+\s+\d+:\d+:\d+)\s+(?P<hostname>\S+)\s+(?P<service>\S+):\s+(?P<message>.*)'
+      
+      - timestamp:
+          source: timestamp
+          format: Jan _2 15:04:05
+      
+      - labels:
+          hostname:
+          service:
+
+  # Docker container logs
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: label
+            values: ["logging=promtail"]
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      - source_labels: ['__meta_docker_container_log_stream']
+        target_label: 'logstream'
+      - source_labels: ['__meta_docker_container_label_logging_jobname']
+        target_label: 'job'
+    pipeline_stages:
+      # Parse container logs
+      - cri: {}
+      
+      # Extract JSON from application logs
+      - match:
+          selector: '{job="qdrant-neo4j-crawl4ai-mcp"}'
+          stages:
+            - json:
+                expressions:
+                  level: level
+                  timestamp: timestamp
+                  message: message
+                  module: module
+                  trace_id: trace_id
+            
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            
+            - labels:
+                level:
+                module:
+                trace_id:
+
+  # Qdrant logs
+  - job_name: qdrant
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: qdrant
+          service: qdrant
+          environment: development
+          __path__: /var/log/qdrant/*.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z)\s+(?P<level>\w+)\s+(?P<message>.*)'
+      
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      
+      - labels:
+          level:
+
+  # Neo4j logs
+  - job_name: neo4j
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: neo4j
+          service: neo4j
+          environment: development
+          __path__: /var/log/neo4j/*.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d+\+\d{4})\s+(?P<level>\w+)\s+(?P<message>.*)'
+      
+      - timestamp:
+          source: timestamp
+          format: '2006-01-02 15:04:05.000+0000'
+      
+      - labels:
+          level:
+
+  # Redis logs
+  - job_name: redis
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: redis
+          service: redis
+          environment: development
+          __path__: /var/log/redis/*.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<pid>\d+):(?P<role>\w+)\s+(?P<timestamp>\d{2}\s+\w+\s+\d{4}\s+\d{2}:\d{2}:\d{2}\.\d+)\s+(?P<level>[\*\#\-\.])\s+(?P<message>.*)'
+      
+      - timestamp:
+          source: timestamp
+          format: '02 Jan 2006 15:04:05.000'
+      
+      - labels:
+          role:
+          level:
+
+  # Nginx access logs
+  - job_name: nginx-access
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx
+          service: nginx
+          log_type: access
+          environment: development
+          __path__: /var/log/nginx/access.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<remote_addr>\S+)\s+-\s+(?P<remote_user>\S+)\s+\[(?P<timestamp>[^\]]+)\]\s+"(?P<method>\S+)\s+(?P<path>\S+)\s+(?P<protocol>\S+)"\s+(?P<status>\d+)\s+(?P<body_bytes_sent>\d+)\s+"(?P<referer>[^"]*)"\s+"(?P<user_agent>[^"]*)"'
+      
+      - timestamp:
+          source: timestamp
+          format: '02/Jan/2006:15:04:05 -0700'
+      
+      - labels:
+          method:
+          status:
+          path:
+
+  # Nginx error logs
+  - job_name: nginx-error
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx
+          service: nginx
+          log_type: error
+          environment: development
+          __path__: /var/log/nginx/error.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+\[(?P<level>\w+)\]\s+(?P<message>.*)'
+      
+      - timestamp:
+          source: timestamp
+          format: '2006/01/02 15:04:05'
+      
+      - labels:
+          level:
+
+# Target configuration
+target_config:
+  sync_period: 10s

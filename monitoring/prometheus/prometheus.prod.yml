@@ -1,0 +1,145 @@
+# Prometheus configuration for Qdrant Neo4j Crawl4AI MCP Server
+# Production environment monitoring setup with enhanced security and performance
+
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+  scrape_timeout: 15s
+  external_labels:
+    environment: 'production'
+    cluster: 'qdrant-neo4j-crawl4ai-mcp'
+
+rule_files:
+  - "rules/*.yml"
+  - "alerts/*.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+      timeout: 10s
+      api_version: v2
+
+scrape_configs:
+  # Main application metrics with authentication
+  - job_name: 'qdrant-neo4j-crawl4ai-mcp'
+    static_configs:
+      - targets: ['qdrant-neo4j-crawl4ai-mcp:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    honor_timestamps: true
+    scheme: http
+    # basic_auth:
+    #   username: 'prometheus'
+    #   password: 'secure_password'
+
+  # Qdrant vector database metrics
+  - job_name: 'qdrant'
+    static_configs:
+      - targets: ['qdrant:6333']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 15s
+
+  # Neo4j graph database metrics
+  - job_name: 'neo4j'
+    static_configs:
+      - targets: ['neo4j:2004']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 15s
+
+  # Redis cache metrics with Redis exporter
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 30s
+
+  # System metrics from node exporter
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 30s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: node-exporter:9100
+
+  # Container metrics from cAdvisor
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 30s
+    metrics_path: '/metrics'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 30s
+
+  # Grafana metrics
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+    metrics_path: '/metrics'
+    scrape_interval: 60s
+
+  # Loki metrics
+  - job_name: 'loki'
+    static_configs:
+      - targets: ['loki:3100']
+    metrics_path: '/metrics'
+    scrape_interval: 60s
+
+  # Jaeger tracing metrics
+  - job_name: 'jaeger'
+    static_configs:
+      - targets: ['jaeger:14269']
+    metrics_path: '/metrics'
+    scrape_interval: 60s
+
+  # nginx reverse proxy metrics
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx-exporter:9113']
+    scrape_interval: 30s
+
+  # Blackbox exporter for endpoint monitoring
+  - job_name: 'blackbox'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+        - https://your-domain.com/health
+        - https://your-domain.com/ready
+        - https://your-domain.com/metrics
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+# Remote write configuration for long-term storage
+remote_write:
+  - url: "https://prometheus-remote-write.your-domain.com/api/v1/write"
+    headers:
+      Authorization: "Bearer ${PROMETHEUS_REMOTE_WRITE_TOKEN}"
+    queue_config:
+      max_samples_per_send: 1000
+      max_shards: 200
+      capacity: 2500
+
+# Remote read configuration
+remote_read:
+  - url: "https://prometheus-remote-read.your-domain.com/api/v1/read"
+    headers:
+      Authorization: "Bearer ${PROMETHEUS_REMOTE_READ_TOKEN}"

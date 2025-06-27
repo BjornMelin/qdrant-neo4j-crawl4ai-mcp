@@ -1,0 +1,440 @@
+# Promtail configuration for Qdrant Neo4j Crawl4AI MCP Server
+# Production log shipping with enhanced processing and filtering
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: warn
+  log_format: json
+  disable_log_metrics: false
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    batchwait: 1s
+    batchsize: 1048576
+    timeout: 30s
+    min_backoff: 500ms
+    max_backoff: 5m
+    max_retries: 20
+    tenant_id: production
+    external_labels:
+      environment: production
+      cluster: qdrant-neo4j-crawl4ai-mcp
+      region: ${AWS_REGION}
+      datacenter: ${DATACENTER}
+
+positions:
+  filename: /var/lib/promtail/positions.yaml
+  sync_period: 10s
+  ignore_invalid_yaml: false
+
+scrape_configs:
+  # High-priority application logs
+  - job_name: qdrant-neo4j-crawl4ai-mcp
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: qdrant-neo4j-crawl4ai-mcp
+          service: qdrant-neo4j-crawl4ai-mcp
+          environment: production
+          priority: high
+          __path__: /var/log/qdrant-neo4j-crawl4ai-mcp/*.log
+    pipeline_stages:
+      # Parse structured JSON logs
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            message: message
+            module: module
+            trace_id: trace_id
+            span_id: span_id
+            user_id: user_id
+            request_id: request_id
+            duration_ms: duration_ms
+            status_code: status_code
+            endpoint: endpoint
+            method: method
+            error_code: error_code
+            error_type: error_type
+      
+      # Validate and parse timestamp
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+          fallback_formats:
+            - RFC3339
+            - '2006-01-02T15:04:05Z'
+            - '2006-01-02 15:04:05'
+      
+      # Add structured labels
+      - labels:
+          level:
+          module:
+          trace_id:
+          span_id:
+          endpoint:
+          method:
+          error_type:
+      
+      # Filter out noise in production
+      - drop:
+          source: level
+          expression: "DEBUG"
+      
+      - drop:
+          source: message
+          expression: "health check"
+          older_than: 1h
+      
+      # Alert on errors
+      - match:
+          selector: '{level="ERROR"}'
+          stages:
+            - labels:
+                alert: "error"
+                severity: "high"
+      
+      # Alert on critical errors
+      - match:
+          selector: '{level="CRITICAL"}'
+          stages:
+            - labels:
+                alert: "critical"
+                severity: "critical"
+      
+      # Parse performance metrics
+      - regex:
+          expression: '(?P<response_time>\d+\.?\d*)ms'
+          source: message
+      
+      - labels:
+          response_time:
+      
+      # Metric extraction for alerting
+      - metrics:
+          error_rate:
+            type: Counter
+            description: "Error rate by service"
+            source: level
+            config:
+              match_all: true
+              count_entry_bytes: false
+              action: inc
+          request_duration:
+            type: Histogram
+            description: "Request duration in milliseconds"
+            source: duration_ms
+            config:
+              buckets: [0.1, 0.5, 1, 2.5, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000]
+
+  # Critical system logs
+  - job_name: system-critical
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: system
+          service: system
+          environment: production
+          priority: critical
+          __path__: /var/log/{messages,syslog,kern.log}
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\w+\s+\d+\s+\d+:\d+:\d+)\s+(?P<hostname>\S+)\s+(?P<service>\S+)(\[(?P<pid>\d+)\])?:\s+(?P<message>.*)'
+      
+      - timestamp:
+          source: timestamp
+          format: Jan _2 15:04:05
+      
+      - labels:
+          hostname:
+          service:
+          pid:
+      
+      # Alert on system errors
+      - match:
+          selector: '{service=~"kernel|systemd"}'
+          stages:
+            - regex:
+                expression: '(?i)(error|fail|panic|oops|segfault)'
+                source: message
+            - labels:
+                alert: "system_error"
+                severity: "high"
+
+  # Production Docker container logs with enhanced filtering
+  - job_name: docker-containers
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: label
+            values: ["logging=promtail"]
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      - source_labels: ['__meta_docker_container_log_stream']
+        target_label: 'logstream'
+      - source_labels: ['__meta_docker_container_label_logging_jobname']
+        target_label: 'job'
+      - source_labels: ['__meta_docker_container_label_service']
+        target_label: 'service'
+      - source_labels: ['__meta_docker_container_label_version']
+        target_label: 'version'
+    pipeline_stages:
+      # Parse container runtime logs
+      - cri: {}
+      
+      # Enhanced application log processing
+      - match:
+          selector: '{job="qdrant-neo4j-crawl4ai-mcp"}'
+          stages:
+            - json:
+                expressions:
+                  level: level
+                  timestamp: timestamp
+                  message: message
+                  module: module
+                  trace_id: trace_id
+                  request_id: request_id
+                  user_id: user_id
+                  duration: duration
+                  status: status
+            
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            
+            - labels:
+                level:
+                module:
+                trace_id:
+                request_id:
+            
+            # Rate limiting for high-volume logs
+            - limit:
+                rate: 1000
+                burst: 2000
+                drop: true
+
+  # Database logs with enhanced monitoring
+  - job_name: qdrant-production
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: qdrant
+          service: qdrant
+          environment: production
+          priority: high
+          __path__: /var/log/qdrant/*.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z)\s+(?P<level>\w+)\s+(?P<thread>\S+)\s+(?P<message>.*)'
+      
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      
+      - labels:
+          level:
+          thread:
+      
+      # Alert on Qdrant errors
+      - match:
+          selector: '{level=~"ERROR|WARN"}'
+          stages:
+            - labels:
+                alert: "qdrant_issue"
+                severity: "medium"
+      
+      # Performance monitoring
+      - regex:
+          expression: 'query_time=(?P<query_time>\d+\.?\d*)ms'
+          source: message
+      
+      - labels:
+          query_time:
+
+  # Neo4j production logs
+  - job_name: neo4j-production
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: neo4j
+          service: neo4j
+          environment: production
+          priority: high
+          __path__: /var/log/neo4j/*.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d+\+\d{4})\s+(?P<level>\w+)\s+(?P<thread>\S+)\s+(?P<message>.*)'
+      
+      - timestamp:
+          source: timestamp
+          format: '2006-01-02 15:04:05.000+0000'
+      
+      - labels:
+          level:
+          thread:
+      
+      # Monitor slow queries
+      - regex:
+          expression: 'runtime=(?P<runtime>\d+\.?\d*)ms'
+          source: message
+      
+      - labels:
+          runtime:
+      
+      # Alert on Neo4j issues
+      - match:
+          selector: '{level=~"ERROR|WARN"}'
+          stages:
+            - labels:
+                alert: "neo4j_issue"
+                severity: "medium"
+
+  # Redis production logs
+  - job_name: redis-production
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: redis
+          service: redis
+          environment: production
+          priority: medium
+          __path__: /var/log/redis/*.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<pid>\d+):(?P<role>\w+)\s+(?P<timestamp>\d{2}\s+\w+\s+\d{4}\s+\d{2}:\d{2}:\d{2}\.\d+)\s+(?P<level>[\*\#\-\.])\s+(?P<message>.*)'
+      
+      - timestamp:
+          source: timestamp
+          format: '02 Jan 2006 15:04:05.000'
+      
+      - labels:
+          role:
+          level:
+      
+      # Alert on Redis warnings
+      - match:
+          selector: '{level="#"}'
+          stages:
+            - labels:
+                alert: "redis_warning"
+                severity: "low"
+
+  # Load balancer logs with detailed analysis
+  - job_name: nginx-production
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx
+          service: nginx
+          environment: production
+          priority: high
+          __path__: /var/log/nginx/*.log
+    pipeline_stages:
+      # Access logs
+      - match:
+          selector: '{__path__=~".*/access.log"}'
+          stages:
+            - regex:
+                expression: '^(?P<remote_addr>\S+)\s+-\s+(?P<remote_user>\S+)\s+\[(?P<timestamp>[^\]]+)\]\s+"(?P<method>\S+)\s+(?P<path>\S+)\s+(?P<protocol>\S+)"\s+(?P<status>\d+)\s+(?P<body_bytes_sent>\d+)\s+"(?P<referer>[^"]*)"\s+"(?P<user_agent>[^"]*)"\s+(?P<request_time>\S+)\s+(?P<upstream_response_time>\S+)'
+            
+            - timestamp:
+                source: timestamp
+                format: '02/Jan/2006:15:04:05 -0700'
+            
+            - labels:
+                method:
+                status:
+                path:
+                request_time:
+            
+            # Alert on high error rates
+            - match:
+                selector: '{status=~"5.."}'
+                stages:
+                  - labels:
+                      alert: "http_5xx"
+                      severity: "high"
+            
+            # Monitor slow requests
+            - match:
+                selector: '{request_time=~"[1-9]\\d*\\..*"}'  # > 1 second
+                stages:
+                  - labels:
+                      alert: "slow_request"
+                      severity: "medium"
+      
+      # Error logs
+      - match:
+          selector: '{__path__=~".*/error.log"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+\[(?P<level>\w+)\]\s+(?P<message>.*)'
+            
+            - timestamp:
+                source: timestamp
+                format: '2006/01/02 15:04:05'
+            
+            - labels:
+                level:
+            
+            - match:
+                selector: '{level=~"error|crit"}'
+                stages:
+                  - labels:
+                      alert: "nginx_error"
+                      severity: "high"
+
+  # Security logs
+  - job_name: security-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: security
+          service: security
+          environment: production
+          priority: critical
+          __path__: /var/log/{auth.log,secure,audit/*.log}
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\w+\s+\d+\s+\d+:\d+:\d+)\s+(?P<hostname>\S+)\s+(?P<program>\S+)(\[(?P<pid>\d+)\])?:\s+(?P<message>.*)'
+      
+      - timestamp:
+          source: timestamp
+          format: Jan _2 15:04:05
+      
+      - labels:
+          hostname:
+          program:
+          pid:
+      
+      # Alert on security events
+      - match:
+          selector: '{program=~"sshd|sudo|su"}'
+          stages:
+            - regex:
+                expression: '(?i)(failed|invalid|illegal|denied|unauthorized)'
+                source: message
+            - labels:
+                alert: "security_event"
+                severity: "critical"
+
+# Target configuration with production optimizations
+target_config:
+  sync_period: 10s
+
+# Limits configuration for production
+limits_config:
+  readline_rate: 10000
+  readline_burst: 20000
