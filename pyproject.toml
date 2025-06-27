@@ -1,0 +1,288 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "qdrant-neo4j-crawl4ai-mcp"
+version = "1.0.0"
+description = "Production-ready MCP server combining Qdrant vector search, Neo4j knowledge graphs, and Crawl4AI web intelligence"
+authors = [
+    {name = "Portfolio Project", email = "developer@example.com"},
+]
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "fastmcp>=2.0.0",
+    "fastapi[all]>=0.104.0",
+    "pydantic[email]>=2.5.0",
+    "uvicorn[standard]>=0.24.0",
+    "python-jose[cryptography]>=3.3.0",
+    "python-multipart>=0.0.6",
+    "passlib[bcrypt]>=1.7.4",
+    "slowapi>=0.1.9",
+    "structlog>=23.2.0",
+    "httpx>=0.25.0",
+    "python-dotenv>=1.0.0",
+    "redis>=5.0.0",
+    "aiofiles>=23.2.1",
+    "prometheus-client>=0.19.0",
+    # Vector database dependencies
+    "qdrant-client>=1.7.0",
+    "sentence-transformers>=2.2.2",
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.0.0",
+    "pydantic-settings>=2.10.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "pytest-httpx>=0.30.0",
+    "pytest-benchmark>=4.0.0",
+    "pytest-xdist>=3.5.0",
+    "pytest-timeout>=2.3.0",
+    "hypothesis>=6.100.0",
+    "httpx>=0.25.0",
+    "ruff>=0.1.6",
+    "bandit>=1.7.5",
+    "safety>=2.3.5",
+    "mypy>=1.7.0",
+    "pre-commit>=3.5.0",
+    "factory-boy>=3.3.0",
+    "faker>=20.1.0",
+    "testcontainers>=4.0.0",
+    "syrupy>=4.6.0",
+]
+
+test = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "pytest-httpx>=0.30.0",
+    "pytest-benchmark>=4.0.0",
+    "pytest-xdist>=3.5.0",
+    "pytest-timeout>=2.3.0",
+    "hypothesis>=6.100.0",
+    "httpx>=0.25.0",
+    "factory-boy>=3.3.0",
+    "faker>=20.1.0",
+    "testcontainers>=4.0.0",
+    "syrupy>=4.6.0",
+]
+
+security = [
+    "bandit>=1.7.5",
+    "safety>=2.3.5",
+]
+
+[project.scripts]
+qdrant-neo4j-crawl4ai-mcp = "qdrant_neo4j_crawl4ai_mcp.main:main"
+
+[project.urls]
+Homepage = "https://github.com/your-username/qdrant-neo4j-crawl4ai-mcp"
+Repository = "https://github.com/your-username/qdrant-neo4j-crawl4ai-mcp"
+Issues = "https://github.com/your-username/qdrant-neo4j-crawl4ai-mcp/issues"
+
+# Ruff configuration for security-focused linting
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+extend-exclude = ["migrations"]
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # Pyflakes
+    "S",     # bandit security checks
+    "B",     # flake8-bugbear
+    "I",     # isort
+    "N",     # pep8-naming
+    "UP",    # pyupgrade
+    "YTT",   # flake8-2020
+    "ANN",   # flake8-annotations
+    "ASYNC", # flake8-async
+    "C4",    # flake8-comprehensions
+    "DTZ",   # flake8-datetimez
+    "T10",   # flake8-debugger
+    "ISC",   # flake8-implicit-str-concat
+    "ICN",   # flake8-import-conventions
+    "G",     # flake8-logging-format
+    "PIE",   # flake8-pie
+    "T20",   # flake8-print
+    "PYI",   # flake8-pyi
+    "PT",    # flake8-pytest-style
+    "Q",     # flake8-quotes
+    "RSE",   # flake8-raise
+    "RET",   # flake8-return
+    "SLF",   # flake8-self
+    "SIM",   # flake8-simplify
+    "TID",   # flake8-tidy-imports
+    "TCH",   # flake8-type-checking
+    "ARG",   # flake8-unused-arguments
+    "PTH",   # flake8-use-pathlib
+    "ERA",   # eradicate
+    "PD",    # pandas-vet
+    "PGH",   # pygrep-hooks
+    "PL",    # Pylint
+    "TRY",   # tryceratops
+    "FLY",   # flynt
+    "NPY",   # NumPy-specific rules
+    "PERF",  # Perflint
+    "FURB",  # refurb
+    "LOG",   # flake8-logging
+    "RUF",   # Ruff-specific rules
+]
+
+ignore = [
+    "S101",   # Use of assert (OK in tests)
+    "S311",   # Standard pseudo-random generators (OK for non-crypto use)
+    "ANN101", # Missing type annotation for self
+    "ANN102", # Missing type annotation for cls
+    "D",      # pydocstyle (we'll add this gradually)
+    "COM",    # flake8-commas (conflicts with formatter)
+    "EM",     # flake8-errmsg (can be overly strict)
+    "TRY003", # Avoid specifying long messages outside exception class
+    "PLR0913", # Too many arguments to function call (can be legitimate)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "S101",    # Use of assert (OK in tests)
+    "S106",    # Possible hardcoded password (OK in tests)
+    "S108",    # Probable insecure usage of temp file/directory (OK in tests)
+    "PLR2004", # Magic value used in comparison (OK in tests)
+    "ANN001",  # Missing type annotation for function argument (less strict in tests)
+    "ANN201",  # Missing return type annotation for public function (less strict in tests)
+]
+
+[tool.ruff.lint.flake8-type-checking]
+strict = true
+
+[tool.ruff.lint.isort]
+known-first-party = ["qdrant_neo4j_crawl4ai_mcp"]
+force-sort-within-sections = true
+
+# MyPy configuration
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = [
+    "fastmcp.*",
+    "slowapi.*",
+    "structlog.*",
+    "prometheus_client.*",
+    "qdrant_client.*",
+    "sentence_transformers.*",
+]
+ignore_missing_imports = true
+
+# Pytest configuration
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--cov=qdrant_neo4j_crawl4ai_mcp",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+    "--cov-fail-under=90",
+    "--cov-branch",
+    "--timeout=300",
+    "--tb=short",
+]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+timeout = 300
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests", 
+    "e2e: End-to-end tests",
+    "slow: Slow tests (deselect with '-m \"not slow\"')",
+    "network: Tests requiring network",
+    "security: Security-focused tests",
+    "performance: Performance and benchmarking tests",
+    "property: Property-based tests",
+    "contract: Contract tests for MCP tools",
+]
+filterwarnings = [
+    "error",
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+# Coverage configuration
+[tool.coverage.run]
+source = ["qdrant_neo4j_crawl4ai_mcp"]
+omit = [
+    "*/tests/*",
+    "*/migrations/*",
+    "*/venv/*",
+    "*/.venv/*",
+    "*/__pycache__/*",
+]
+branch = true
+concurrency = ["thread", "greenlet"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+show_missing = true
+skip_covered = false
+precision = 2
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.coverage.xml]
+output = "coverage.xml"
+
+# Bandit security configuration
+[tool.bandit]
+exclude_dirs = ["tests", "migrations"]
+skips = ["B101", "B601"]  # Allow assert and shell usage in specific contexts
+
+[tool.bandit.assert_used]
+skips = ["*/tests/*"]  # Allow assert in tests
