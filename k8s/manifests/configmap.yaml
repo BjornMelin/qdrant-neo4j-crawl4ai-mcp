@@ -1,0 +1,348 @@
+# Kubernetes ConfigMaps for Qdrant Neo4j Crawl4AI MCP Server
+# Application configuration and environment variables
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: qdrant-neo4j-crawl4ai-mcp-config
+  namespace: qdrant-neo4j-crawl4ai-mcp
+  labels:
+    app.kubernetes.io/name: qdrant-neo4j-crawl4ai-mcp-server
+    app.kubernetes.io/instance: qdrant-neo4j-crawl4ai-mcp
+    app.kubernetes.io/component: config
+  annotations:
+    kubernetes.io/description: "Application configuration for Qdrant Neo4j Crawl4AI MCP Server"
+data:
+  # Environment Configuration
+  ENVIRONMENT: "production"
+  DEBUG: "false"
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "json"
+  
+  # Server Configuration
+  HOST: "0.0.0.0"
+  PORT: "8000"
+  WORKERS: "4"
+  MAX_WORKERS: "8"
+  WORKER_TIMEOUT: "120"
+  KEEPALIVE_TIMEOUT: "5"
+  
+  # API Configuration
+  API_V1_PREFIX: "/api/v1"
+  DOCS_URL: "/docs"
+  REDOC_URL: "/redoc"
+  OPENAPI_URL: "/openapi.json"
+  
+  # Security Configuration
+  ENABLE_SWAGGER_UI: "false"
+  ENABLE_REDOC: "false"
+  ENABLE_PROMETHEUS: "true"
+  ENABLE_CORS: "true"
+  CORS_ORIGINS: '["https://app.company.com", "https://dashboard.company.com"]'
+  CORS_METHODS: '["GET", "POST", "PUT", "DELETE", "OPTIONS"]'
+  CORS_HEADERS: '["Content-Type", "Authorization", "X-Requested-With"]'
+  
+  # Authentication Configuration
+  JWT_ALGORITHM: "HS256"
+  JWT_EXPIRE_MINUTES: "60"
+  JWT_REFRESH_EXPIRE_DAYS: "30"
+  ACCESS_TOKEN_EXPIRE_MINUTES: "60"
+  REFRESH_TOKEN_EXPIRE_DAYS: "7"
+  
+  # Rate Limiting
+  RATE_LIMIT_ENABLED: "true"
+  RATE_LIMIT_REQUESTS: "100"
+  RATE_LIMIT_WINDOW: "60"
+  RATE_LIMIT_BURST: "20"
+  
+  # Service Configuration
+  DEFAULT_COLLECTION: "unified_intelligence"
+  DEFAULT_EMBEDDING_MODEL: "sentence-transformers/all-MiniLM-L6-v2"
+  EMBEDDING_CACHE_SIZE: "1000"
+  EMBEDDING_CACHE_TTL: "3600"
+  VECTOR_DIMENSIONS: "384"
+  
+  # External Service Configuration
+  CRAWL4AI_MAX_CONCURRENT: "10"
+  CRAWL4AI_REQUEST_TIMEOUT: "60"
+  CRAWL4AI_MAX_RETRIES: "3"
+  CRAWL4AI_RETRY_DELAY: "1"
+  
+  # Database Configuration
+  QDRANT_URL: "http://qdrant-service:6333"
+  QDRANT_COLLECTION_NAME: "unified_intelligence"
+  QDRANT_TIMEOUT: "30"
+  QDRANT_RETRY_COUNT: "3"
+  
+  NEO4J_URI: "bolt://neo4j-service:7687"
+  NEO4J_USER: "neo4j"
+  NEO4J_DATABASE: "neo4j"
+  NEO4J_MAX_CONNECTION_POOL_SIZE: "100"
+  NEO4J_MAX_TRANSACTION_RETRY_TIME: "30"
+  NEO4J_CONNECTION_TIMEOUT: "30"
+  NEO4J_TRUST_STRATEGY: "TRUST_ALL_CERTIFICATES"
+  
+  REDIS_URL: "redis://redis-service:6379/0"
+  REDIS_MAX_CONNECTIONS: "100"
+  REDIS_RETRY_ON_TIMEOUT: "true"
+  REDIS_HEALTH_CHECK_INTERVAL: "30"
+  REDIS_SOCKET_CONNECT_TIMEOUT: "5"
+  REDIS_SOCKET_KEEPALIVE: "true"
+  REDIS_SOCKET_KEEPALIVE_OPTIONS: '{}'
+  
+  # Caching Configuration
+  CACHE_ENABLED: "true"
+  CACHE_TTL: "3600"
+  CACHE_MAX_SIZE: "10000"
+  CACHE_BACKEND: "redis"
+  
+  # Background Task Configuration
+  CELERY_BROKER_URL: "redis://redis-service:6379/1"
+  CELERY_RESULT_BACKEND: "redis://redis-service:6379/2"
+  CELERY_TASK_SERIALIZER: "json"
+  CELERY_RESULT_SERIALIZER: "json"
+  CELERY_ACCEPT_CONTENT: '["json"]'
+  CELERY_TIMEZONE: "UTC"
+  CELERY_ENABLE_UTC: "true"
+  CELERY_WORKER_CONCURRENCY: "4"
+  CELERY_WORKER_MAX_TASKS_PER_CHILD: "1000"
+  
+  # Monitoring and Observability
+  METRICS_ENABLED: "true"
+  METRICS_PATH: "/metrics"
+  METRICS_PORT: "9090"
+  HEALTH_CHECK_PATH: "/health"
+  READINESS_CHECK_PATH: "/ready"
+  STARTUP_CHECK_PATH: "/startup"
+  
+  # Tracing Configuration
+  TRACING_ENABLED: "true"
+  JAEGER_AGENT_HOST: "jaeger-agent"
+  JAEGER_AGENT_PORT: "6831"
+  JAEGER_SAMPLER_TYPE: "const"
+  JAEGER_SAMPLER_PARAM: "1"
+  JAEGER_SERVICE_NAME: "qdrant-neo4j-crawl4ai-mcp-server"
+  OTEL_EXPORTER_JAEGER_ENDPOINT: "http://jaeger:14268/api/traces"
+  OTEL_RESOURCE_ATTRIBUTES: "service.name=qdrant-neo4j-crawl4ai-mcp-server,service.version=1.0.0"
+  
+  # Logging Configuration
+  LOG_JSON_FORMAT: "true"
+  LOG_SHOW_TRACE_ID: "true"
+  LOG_SHOW_REQUEST_ID: "true"
+  LOG_CORRELATION_ID_HEADER: "X-Correlation-ID"
+  LOG_MAX_FILE_SIZE: "100MB"
+  LOG_BACKUP_COUNT: "5"
+  LOG_ROTATION_INTERVAL: "midnight"
+  
+  # Performance Configuration
+  MAX_REQUEST_SIZE: "10MB"
+  MAX_UPLOAD_SIZE: "100MB"
+  REQUEST_TIMEOUT: "30"
+  KEEP_ALIVE_TIMEOUT: "5"
+  GRACEFUL_SHUTDOWN_TIMEOUT: "30"
+  
+  # Feature Flags
+  FEATURE_VECTOR_SEARCH: "true"
+  FEATURE_GRAPH_ANALYSIS: "true"
+  FEATURE_WEB_SCRAPING: "true"
+  FEATURE_BATCH_PROCESSING: "true"
+  FEATURE_ASYNC_TASKS: "true"
+  FEATURE_FILE_UPLOAD: "true"
+  FEATURE_EXPORT: "true"
+  
+  # Content Processing
+  MAX_CONTENT_LENGTH: "1000000"
+  MIN_CONTENT_LENGTH: "10"
+  CONTENT_CHUNK_SIZE: "1000"
+  CONTENT_CHUNK_OVERLAP: "200"
+  SUPPORTED_FILE_TYPES: '["txt", "pdf", "docx", "md", "html", "json", "csv"]'
+  
+  # Backup and Recovery
+  BACKUP_ENABLED: "true"
+  BACKUP_SCHEDULE: "0 2 * * *"  # Daily at 2 AM
+  BACKUP_RETENTION_DAYS: "30"
+  BACKUP_COMPRESSION: "true"
+  
+  # Kubernetes Specific
+  KUBERNETES_NAMESPACE: "qdrant-neo4j-crawl4ai-mcp"
+  KUBERNETES_POD_NAME: "${POD_NAME}"
+  KUBERNETES_NODE_NAME: "${NODE_NAME}"
+---
+# Logging configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logging-config
+  namespace: qdrant-neo4j-crawl4ai-mcp
+  labels:
+    app.kubernetes.io/name: qdrant-neo4j-crawl4ai-mcp-server
+    app.kubernetes.io/instance: qdrant-neo4j-crawl4ai-mcp
+    app.kubernetes.io/component: logging-config
+data:
+  logging.yaml: |
+    version: 1
+    disable_existing_loggers: false
+    
+    formatters:
+      standard:
+        format: '[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s'
+        datefmt: '%Y-%m-%d %H:%M:%S'
+      
+      json:
+        class: pythonjsonlogger.jsonlogger.JsonFormatter
+        format: '%(asctime)s %(name)s %(levelname)s %(pathname)s %(lineno)d %(message)s'
+        datefmt: '%Y-%m-%dT%H:%M:%S'
+      
+      detailed:
+        format: '[%(asctime)s] [%(name)s] [%(levelname)s] [%(pathname)s:%(lineno)d] [%(funcName)s] %(message)s'
+        datefmt: '%Y-%m-%d %H:%M:%S'
+    
+    handlers:
+      console:
+        class: logging.StreamHandler
+        level: INFO
+        formatter: json
+        stream: ext://sys.stdout
+      
+      file:
+        class: logging.handlers.RotatingFileHandler
+        level: INFO
+        formatter: json
+        filename: /app/logs/app.log
+        maxBytes: 104857600  # 100MB
+        backupCount: 5
+        encoding: utf8
+      
+      error_file:
+        class: logging.handlers.RotatingFileHandler
+        level: ERROR
+        formatter: detailed
+        filename: /app/logs/error.log
+        maxBytes: 52428800  # 50MB
+        backupCount: 3
+        encoding: utf8
+    
+    loggers:
+      uvicorn:
+        level: INFO
+        handlers: [console, file]
+        propagate: false
+      
+      uvicorn.error:
+        level: INFO
+        handlers: [console, error_file]
+        propagate: false
+      
+      uvicorn.access:
+        level: INFO
+        handlers: [console, file]
+        propagate: false
+      
+      fastapi:
+        level: INFO
+        handlers: [console, file]
+        propagate: false
+      
+      qdrant_neo4j_crawl4ai_mcp:
+        level: INFO
+        handlers: [console, file]
+        propagate: false
+      
+      sqlalchemy:
+        level: WARNING
+        handlers: [console, file]
+        propagate: false
+      
+      redis:
+        level: WARNING
+        handlers: [console, file]
+        propagate: false
+      
+      neo4j:
+        level: WARNING
+        handlers: [console, file]
+        propagate: false
+      
+      qdrant_client:
+        level: WARNING
+        handlers: [console, file]
+        propagate: false
+    
+    root:
+      level: INFO
+      handlers: [console, file]
+---
+# Application metrics configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: metrics-config
+  namespace: qdrant-neo4j-crawl4ai-mcp
+  labels:
+    app.kubernetes.io/name: qdrant-neo4j-crawl4ai-mcp-server
+    app.kubernetes.io/instance: qdrant-neo4j-crawl4ai-mcp
+    app.kubernetes.io/component: metrics-config
+data:
+  metrics.yaml: |
+    # Prometheus metrics configuration
+    metrics:
+      enabled: true
+      path: /metrics
+      port: 9090
+      
+      # Custom metrics
+      custom_metrics:
+        - name: http_requests_total
+          type: counter
+          description: Total HTTP requests
+          labels: [method, endpoint, status_code]
+        
+        - name: http_request_duration_seconds
+          type: histogram
+          description: HTTP request duration in seconds
+          labels: [method, endpoint]
+          buckets: [0.1, 0.5, 1.0, 2.5, 5.0, 10.0]
+        
+        - name: vector_operations_total
+          type: counter
+          description: Total vector operations
+          labels: [operation, collection, status]
+        
+        - name: vector_operation_duration_seconds
+          type: histogram
+          description: Vector operation duration in seconds
+          labels: [operation, collection]
+          buckets: [0.01, 0.05, 0.1, 0.5, 1.0, 5.0]
+        
+        - name: graph_operations_total
+          type: counter
+          description: Total graph operations
+          labels: [operation, status]
+        
+        - name: cache_operations_total
+          type: counter
+          description: Total cache operations
+          labels: [operation, status]
+        
+        - name: active_connections
+          type: gauge
+          description: Number of active connections
+          labels: [service]
+        
+        - name: queue_size
+          type: gauge
+          description: Current queue size
+          labels: [queue_name]
+      
+      # Health check metrics
+      health_metrics:
+        enabled: true
+        interval: 30
+        
+      # Resource metrics
+      resource_metrics:
+        enabled: true
+        collect_cpu: true
+        collect_memory: true
+        collect_disk: true
+        collect_network: true

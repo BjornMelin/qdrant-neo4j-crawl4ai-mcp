@@ -1,0 +1,146 @@
+# Fly.io deployment configuration for Qdrant Neo4j Crawl4AI MCP Server
+# Production-ready configuration with auto-scaling and edge deployment
+
+app = "qdrant-neo4j-crawl4ai-mcp"
+primary_region = "iad"
+kill_signal = "SIGTERM"
+kill_timeout = "30s"
+
+[experimental]
+  auto_rollback = true
+  enable_machine_autostart = true
+
+[build]
+  dockerfile = "Dockerfile"
+
+# Environment-specific configurations
+[env]
+  ENVIRONMENT = "production"
+  HOST = "0.0.0.0"
+  PORT = "8000"
+  LOG_LEVEL = "INFO"
+  DEBUG = "false"
+  WORKERS = "4"
+  
+  # Service Configuration
+  DEFAULT_COLLECTION = "qdrant_neo4j_crawl4ai_intelligence"
+  DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+  CRAWL4AI_MAX_CONCURRENT = "10"
+  CRAWL4AI_REQUEST_TIMEOUT = "60"
+  
+  # Security Configuration
+  ENABLE_SWAGGER_UI = "false"
+  ENABLE_REDOC = "false"
+  ENABLE_PROMETHEUS = "true"
+  ENABLE_CORS = "true"
+  JWT_ALGORITHM = "HS256"
+  JWT_EXPIRE_MINUTES = "60"
+  
+  # Database URLs (using Fly.io internal networking)
+  QDRANT_URL = "http://qdrant.internal:6333"
+  NEO4J_URI = "bolt://neo4j.internal:7687"
+  NEO4J_USER = "neo4j"
+  NEO4J_DATABASE = "neo4j"
+  REDIS_URL = "redis://redis.internal:6379/0"
+
+# HTTP service configuration
+[[services]]
+  protocol = "tcp"
+  internal_port = 8000
+  processes = ["app"]
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 1000
+    soft_limit = 500
+
+# Health checks
+[[services.http_checks]]
+  interval = "30s"
+  timeout = "10s"
+  grace_period = "30s"
+  method = "GET"
+  path = "/health"
+  protocol = "http"
+  tls_skip_verify = false
+
+[[services.tcp_checks]]
+  interval = "30s"
+  timeout = "10s"
+  grace_period = "30s"
+  port = 8000
+
+# Machine configuration for different regions
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 2
+  memory_mb = 2048
+
+# Auto-scaling configuration
+[scaling]
+  min_machines_running = 1
+  max_machines_running = 10
+
+[[regions]]
+  primary = true
+  code = "iad"  # Ashburn, VA (primary)
+
+[[regions]]
+  code = "lax"  # Los Angeles, CA
+
+[[regions]]
+  code = "fra"  # Frankfurt, Germany
+
+[[regions]]
+  code = "nrt"  # Tokyo, Japan
+
+# Metrics configuration
+[metrics]
+  port = 9091
+  path = "/metrics"
+
+# File system mounts for persistent data
+[mounts]
+  source = "mcp_data"
+  destination = "/app/data"
+  initial_size = "10gb"
+
+[mounts]
+  source = "mcp_logs"
+  destination = "/app/logs"
+  initial_size = "5gb"
+
+# Process groups for different workloads
+[processes]
+  app = "python -m qdrant_neo4j_crawl4ai_mcp.main"
+  worker = "python -m qdrant_neo4j_crawl4ai_mcp.worker"
+
+# Deploy configuration
+[deploy]
+  release_command = "python scripts/migrate.py"
+  strategy = "rolling"
+
+# Machine restart policy
+[restart]
+  policy = "on-failure"
+  max_retries = 3
+
+# Console command for debugging
+[console_command]
+  command = "/bin/bash"
+
+# Secrets (configured via Fly CLI)
+# fly secrets set JWT_SECRET_KEY=...
+# fly secrets set NEO4J_PASSWORD=...
+# fly secrets set QDRANT_API_KEY=...
+# fly secrets set OPENAI_API_KEY=...
+# fly secrets set SENTRY_DSN=...

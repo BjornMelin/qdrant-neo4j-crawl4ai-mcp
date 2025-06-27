@@ -1,0 +1,161 @@
+# Kubernetes namespace for Qdrant Neo4j Crawl4AI MCP Server
+# Isolates resources and provides security boundaries
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: qdrant-neo4j-crawl4ai-mcp
+  labels:
+    name: qdrant-neo4j-crawl4ai-mcp
+    environment: production
+    app.kubernetes.io/name: qdrant-neo4j-crawl4ai-mcp-server
+    app.kubernetes.io/instance: qdrant-neo4j-crawl4ai-mcp
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/component: namespace
+    app.kubernetes.io/part-of: qdrant-neo4j-crawl4ai-mcp-platform
+    app.kubernetes.io/managed-by: kubernetes
+  annotations:
+    description: "Qdrant Neo4j Crawl4AI MCP Server production deployment"
+    contact: "devops@company.com"
+    cost-center: "engineering"
+    backup-policy: "daily"
+    compliance: "gdpr,soc2"
+---
+# Resource quota to limit resource consumption
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: qdrant-neo4j-crawl4ai-mcp-quota
+  namespace: qdrant-neo4j-crawl4ai-mcp
+  labels:
+    app.kubernetes.io/name: qdrant-neo4j-crawl4ai-mcp-server
+    app.kubernetes.io/component: quota
+spec:
+  hard:
+    # Compute resources
+    requests.cpu: "8"
+    requests.memory: 16Gi
+    limits.cpu: "16"
+    limits.memory: 32Gi
+    
+    # Storage resources
+    requests.storage: 100Gi
+    persistentvolumeclaims: "10"
+    
+    # Network resources
+    services: "20"
+    services.loadbalancers: "5"
+    services.nodeports: "10"
+    
+    # Object counts
+    configmaps: "50"
+    secrets: "50"
+    pods: "50"
+    replicationcontrollers: "20"
+    deployments.apps: "20"
+    statefulsets.apps: "10"
+    jobs.batch: "10"
+    cronjobs.batch: "5"
+---
+# Limit range to set default resource limits
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: qdrant-neo4j-crawl4ai-mcp-limits
+  namespace: qdrant-neo4j-crawl4ai-mcp
+  labels:
+    app.kubernetes.io/name: qdrant-neo4j-crawl4ai-mcp-server
+    app.kubernetes.io/component: limits
+spec:
+  limits:
+    # Default limits for containers
+    - default:
+        cpu: 500m
+        memory: 512Mi
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      type: Container
+    
+    # Limits for persistent volume claims
+    - max:
+        storage: 50Gi
+      min:
+        storage: 1Gi
+      type: PersistentVolumeClaim
+    
+    # Limits for pods
+    - max:
+        cpu: "4"
+        memory: 8Gi
+      min:
+        cpu: 50m
+        memory: 64Mi
+      type: Pod
+---
+# Network policy for security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: qdrant-neo4j-crawl4ai-mcp-network-policy
+  namespace: qdrant-neo4j-crawl4ai-mcp
+  labels:
+    app.kubernetes.io/name: qdrant-neo4j-crawl4ai-mcp-server
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: qdrant-neo4j-crawl4ai-mcp-platform
+  policyTypes:
+    - Ingress
+    - Egress
+  
+  ingress:
+    # Allow ingress from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8000
+    
+    # Allow monitoring scraping
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9090  # Prometheus metrics
+        - protocol: TCP
+          port: 3000  # Grafana
+    
+    # Allow internal communication
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: qdrant-neo4j-crawl4ai-mcp-platform
+  
+  egress:
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    
+    # Allow HTTPS for external APIs
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+    
+    # Allow internal communication
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: qdrant-neo4j-crawl4ai-mcp-platform

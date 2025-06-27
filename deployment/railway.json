@@ -1,0 +1,178 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "Dockerfile"
+  },
+  "deploy": {
+    "numReplicas": 2,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3,
+    "sleepApplication": false,
+    "cronSchedule": null
+  },
+  "environments": {
+    "production": {
+      "variables": {
+        "ENVIRONMENT": "production",
+        "LOG_LEVEL": "INFO",
+        "DEBUG": "false",
+        "HOST": "0.0.0.0",
+        "PORT": "8000",
+        "WORKERS": "4",
+        "DEFAULT_COLLECTION": "qdrant_neo4j_crawl4ai_intelligence",
+        "DEFAULT_EMBEDDING_MODEL": "sentence-transformers/all-MiniLM-L6-v2",
+        "CRAWL4AI_MAX_CONCURRENT": "10",
+        "CRAWL4AI_REQUEST_TIMEOUT": "60",
+        "ENABLE_SWAGGER_UI": "false",
+        "ENABLE_REDOC": "false",
+        "ENABLE_PROMETHEUS": "true",
+        "ENABLE_CORS": "true",
+        "JWT_ALGORITHM": "HS256",
+        "JWT_EXPIRE_MINUTES": "60"
+      },
+      "secrets": {
+        "JWT_SECRET_KEY": "${{Railway.JWT_SECRET_KEY}}",
+        "NEO4J_PASSWORD": "${{Railway.NEO4J_PASSWORD}}",
+        "QDRANT_API_KEY": "${{Railway.QDRANT_API_KEY}}",
+        "OPENAI_API_KEY": "${{Railway.OPENAI_API_KEY}}",
+        "SENTRY_DSN": "${{Railway.SENTRY_DSN}}"
+      }
+    },
+    "staging": {
+      "variables": {
+        "ENVIRONMENT": "staging",
+        "LOG_LEVEL": "DEBUG",
+        "DEBUG": "true",
+        "HOST": "0.0.0.0",
+        "PORT": "8000",
+        "WORKERS": "2",
+        "DEFAULT_COLLECTION": "qdrant_neo4j_crawl4ai_staging",
+        "DEFAULT_EMBEDDING_MODEL": "sentence-transformers/all-MiniLM-L6-v2",
+        "CRAWL4AI_MAX_CONCURRENT": "5",
+        "CRAWL4AI_REQUEST_TIMEOUT": "30",
+        "ENABLE_SWAGGER_UI": "true",
+        "ENABLE_REDOC": "true",
+        "ENABLE_PROMETHEUS": "true",
+        "ENABLE_CORS": "true",
+        "JWT_ALGORITHM": "HS256",
+        "JWT_EXPIRE_MINUTES": "1440"
+      },
+      "secrets": {
+        "JWT_SECRET_KEY": "${{Railway.STAGING_JWT_SECRET_KEY}}",
+        "NEO4J_PASSWORD": "${{Railway.STAGING_NEO4J_PASSWORD}}",
+        "QDRANT_API_KEY": "${{Railway.STAGING_QDRANT_API_KEY}}",
+        "OPENAI_API_KEY": "${{Railway.STAGING_OPENAI_API_KEY}}"
+      }
+    }
+  },
+  "services": [
+    {
+      "name": "qdrant-neo4j-crawl4ai-mcp",
+      "source": {
+        "type": "repo",
+        "repo": "your-username/qdrant-neo4j-crawl4ai-mcp"
+      },
+      "variables": {
+        "QDRANT_URL": "${{Qdrant.RAILWAY_TCP_PROXY_DOMAIN}}:${{Qdrant.RAILWAY_TCP_PROXY_PORT}}",
+        "NEO4J_URI": "bolt://${{Neo4j.RAILWAY_TCP_PROXY_DOMAIN}}:${{Neo4j.RAILWAY_TCP_PROXY_PORT}}",
+        "NEO4J_USER": "neo4j",
+        "NEO4J_DATABASE": "neo4j",
+        "REDIS_URL": "redis://${{Redis.RAILWAY_TCP_PROXY_DOMAIN}}:${{Redis.RAILWAY_TCP_PROXY_PORT}}/0"
+      },
+      "domains": [
+        {
+          "domain": "your-domain.com"
+        }
+      ],
+      "healthcheckPath": "/health",
+      "healthcheckTimeout": 30,
+      "restartPolicyType": "ON_FAILURE"
+    },
+    {
+      "name": "qdrant",
+      "source": {
+        "type": "image",
+        "image": "qdrant/qdrant:v1.7.4"
+      },
+      "variables": {
+        "QDRANT__SERVICE__HTTP_PORT": "6333",
+        "QDRANT__SERVICE__GRPC_PORT": "6334",
+        "QDRANT__LOG_LEVEL": "INFO"
+      },
+      "volumes": [
+        {
+          "name": "qdrant-data",
+          "mountPath": "/qdrant/storage"
+        }
+      ]
+    },
+    {
+      "name": "neo4j",
+      "source": {
+        "type": "image",
+        "image": "neo4j:5.15-community"
+      },
+      "variables": {
+        "NEO4J_AUTH": "neo4j/${{Railway.NEO4J_PASSWORD}}",
+        "NEO4J_PLUGINS": "[\"apoc\", \"graph-data-science\"]",
+        "NEO4J_apoc_export_file_enabled": "true",
+        "NEO4J_apoc_import_file_enabled": "true",
+        "NEO4J_dbms_security_procedures_unrestricted": "apoc.*,gds.*",
+        "NEO4J_dbms_memory_heap_initial__size": "512m",
+        "NEO4J_dbms_memory_heap_max__size": "1g",
+        "NEO4J_dbms_memory_pagecache_size": "512m"
+      },
+      "volumes": [
+        {
+          "name": "neo4j-data",
+          "mountPath": "/data"
+        },
+        {
+          "name": "neo4j-logs",
+          "mountPath": "/logs"
+        }
+      ]
+    },
+    {
+      "name": "redis",
+      "source": {
+        "type": "image",
+        "image": "redis:7.2-alpine"
+      },
+      "variables": {},
+      "volumes": [
+        {
+          "name": "redis-data",
+          "mountPath": "/data"
+        }
+      ]
+    }
+  ],
+  "healthcheck": {
+    "path": "/health",
+    "port": 8000,
+    "intervalSeconds": 30,
+    "timeoutSeconds": 10
+  },
+  "scaling": {
+    "minReplicas": 1,
+    "maxReplicas": 5,
+    "targetCPUUtilizationPercentage": 70,
+    "targetMemoryUtilizationPercentage": 80
+  },
+  "networking": {
+    "allowPublic": true,
+    "internalOnly": false
+  },
+  "monitoring": {
+    "metrics": {
+      "enabled": true,
+      "path": "/metrics"
+    },
+    "logging": {
+      "enabled": true,
+      "level": "INFO"
+    }
+  }
+}

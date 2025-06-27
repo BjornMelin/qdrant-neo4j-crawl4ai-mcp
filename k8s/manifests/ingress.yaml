@@ -1,0 +1,290 @@
+# Kubernetes Ingress for Qdrant Neo4j Crawl4AI MCP Server
+# Production-ready ingress with SSL/TLS, rate limiting, and security headers
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: qdrant-neo4j-crawl4ai-mcp-ingress
+  namespace: qdrant-neo4j-crawl4ai-mcp
+  labels:
+    app.kubernetes.io/name: qdrant-neo4j-crawl4ai-mcp-server
+    app.kubernetes.io/instance: qdrant-neo4j-crawl4ai-mcp
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: qdrant-neo4j-crawl4ai-mcp-intelligence
+  annotations:
+    # Ingress controller specific
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # SSL/TLS Configuration
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2 TLSv1.3"
+    nginx.ingress.kubernetes.io/ssl-ciphers: "ECDHE-ECDSA-AES128-GCM-SHA256,ECDHE-RSA-AES128-GCM-SHA256,ECDHE-ECDSA-AES256-GCM-SHA384,ECDHE-RSA-AES256-GCM-SHA384"
+    nginx.ingress.kubernetes.io/ssl-prefer-server-ciphers: "true"
+    
+    # Security Headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+      more_set_headers "Permissions-Policy: geolocation=(), microphone=(), camera=()";
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains; preload";
+      more_set_headers "Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'";
+    
+    # Rate Limiting
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/rate-limit-burst: "50"
+    
+    # Request/Response Configuration
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-next-upstream: "error timeout invalid_header http_500 http_502 http_503 http_504"
+    nginx.ingress.kubernetes.io/proxy-next-upstream-timeout: "0"
+    nginx.ingress.kubernetes.io/proxy-next-upstream-tries: "3"
+    
+    # Backend Configuration
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$remote_addr"
+    nginx.ingress.kubernetes.io/load-balance: "round_robin"
+    
+    # CORS Configuration
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://app.company.com,https://dashboard.company.com"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, PUT, POST, DELETE, PATCH, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,X-Correlation-ID"
+    nginx.ingress.kubernetes.io/cors-expose-headers: "Content-Length,Content-Range,X-Correlation-ID"
+    nginx.ingress.kubernetes.io/cors-max-age: "1728000"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    
+    # Custom Error Pages
+    nginx.ingress.kubernetes.io/custom-http-errors: "404,500,502,503,504"
+    nginx.ingress.kubernetes.io/default-backend: "error-pages"
+    
+    # Monitoring and Logging
+    nginx.ingress.kubernetes.io/enable-access-log: "true"
+    nginx.ingress.kubernetes.io/access-log-path: "/var/log/nginx/access.log"
+    nginx.ingress.kubernetes.io/enable-rewrite-log: "false"
+    
+    # Performance Optimizations
+    nginx.ingress.kubernetes.io/use-gzip: "true"
+    nginx.ingress.kubernetes.io/gzip-types: "text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json application/xml"
+    nginx.ingress.kubernetes.io/enable-brotli: "true"
+    
+    # Connection Keep-Alive
+    nginx.ingress.kubernetes.io/upstream-keepalive-connections: "32"
+    nginx.ingress.kubernetes.io/upstream-keepalive-requests: "100"
+    nginx.ingress.kubernetes.io/upstream-keepalive-timeout: "60"
+    
+    # Client IP Preservation
+    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
+    nginx.ingress.kubernetes.io/compute-full-forwarded-for: "true"
+    nginx.ingress.kubernetes.io/use-proxy-protocol: "false"
+    
+    # WAF Integration (if using ModSecurity)
+    nginx.ingress.kubernetes.io/enable-modsecurity: "true"
+    nginx.ingress.kubernetes.io/enable-owasp-core-rules: "true"
+    nginx.ingress.kubernetes.io/modsecurity-transaction-id: "$request_id"
+    nginx.ingress.kubernetes.io/modsecurity-snippet: |
+      SecAction "id:900001,phase:1,nolog,pass,t:none,setvar:tx.paranoia_level=1"
+      SecAction "id:900002,phase:1,nolog,pass,t:none,setvar:tx.anomaly_score_threshold=5"
+spec:
+  tls:
+    - hosts:
+        - api.qdrant-neo4j-crawl4ai-mcp.company.com
+        - qdrant-neo4j-crawl4ai-mcp-api.company.com
+      secretName: qdrant-neo4j-crawl4ai-mcp-tls
+    - hosts:
+        - monitoring.qdrant-neo4j-crawl4ai-mcp.company.com
+      secretName: qdrant-neo4j-crawl4ai-mcp-monitoring-tls
+  
+  rules:
+    # Main API Domain
+    - host: api.qdrant-neo4j-crawl4ai-mcp.company.com
+      http:
+        paths:
+          # Health checks (no auth required)
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: qdrant-neo4j-crawl4ai-mcp-service
+                port:
+                  number: 8000
+          
+          - path: /ready
+            pathType: Exact
+            backend:
+              service:
+                name: qdrant-neo4j-crawl4ai-mcp-service
+                port:
+                  number: 8000
+          
+          # Metrics endpoint (requires auth)
+          - path: /metrics
+            pathType: Exact
+            backend:
+              service:
+                name: qdrant-neo4j-crawl4ai-mcp-service
+                port:
+                  number: 9090
+          
+          # API endpoints
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: qdrant-neo4j-crawl4ai-mcp-service
+                port:
+                  number: 8000
+          
+          # Documentation (disabled in production)
+          # - path: /docs
+          #   pathType: Exact
+          #   backend:
+          #     service:
+          #       name: qdrant-neo4j-crawl4ai-mcp-server-service
+          #       port:
+          #         number: 8000
+          
+          # Root path
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: qdrant-neo4j-crawl4ai-mcp-service
+                port:
+                  number: 8000
+    
+    # Alternative domain
+    - host: qdrant-neo4j-crawl4ai-mcp-api.company.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: qdrant-neo4j-crawl4ai-mcp-service
+                port:
+                  number: 8000
+    
+    # Monitoring domain (restricted access)
+    - host: monitoring.qdrant-neo4j-crawl4ai-mcp.company.com
+      http:
+        paths:
+          # Grafana
+          - path: /grafana
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana-service
+                port:
+                  number: 3000
+          
+          # Prometheus
+          - path: /prometheus
+            pathType: Prefix
+            backend:
+              service:
+                name: prometheus-service
+                port:
+                  number: 9090
+          
+          # Jaeger
+          - path: /jaeger
+            pathType: Prefix
+            backend:
+              service:
+                name: jaeger-query-service
+                port:
+                  number: 16686
+---
+# Ingress for internal monitoring access
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: qdrant-neo4j-crawl4ai-mcp-monitoring-ingress
+  namespace: qdrant-neo4j-crawl4ai-mcp
+  labels:
+    app.kubernetes.io/name: monitoring
+    app.kubernetes.io/instance: qdrant-neo4j-crawl4ai-mcp
+    app.kubernetes.io/component: monitoring-ingress
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    
+    # Authentication required for monitoring
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: monitoring-auth
+    nginx.ingress.kubernetes.io/auth-realm: "Monitoring Access Required"
+    
+    # Additional security for monitoring
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+    
+    # Rate limiting for monitoring
+    nginx.ingress.kubernetes.io/rate-limit: "30"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+spec:
+  tls:
+    - hosts:
+        - monitoring-internal.qdrant-neo4j-crawl4ai-mcp.company.com
+      secretName: qdrant-neo4j-crawl4ai-mcp-monitoring-internal-tls
+  
+  rules:
+    - host: monitoring-internal.qdrant-neo4j-crawl4ai-mcp.company.com
+      http:
+        paths:
+          # Grafana dashboard
+          - path: /
+            pathType: Exact
+            backend:
+              service:
+                name: grafana-service
+                port:
+                  number: 3000
+          
+          - path: /grafana
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana-service
+                port:
+                  number: 3000
+          
+          # Prometheus
+          - path: /prometheus
+            pathType: Prefix
+            backend:
+              service:
+                name: prometheus-service
+                port:
+                  number: 9090
+          
+          # AlertManager
+          - path: /alertmanager
+            pathType: Prefix
+            backend:
+              service:
+                name: alertmanager-service
+                port:
+                  number: 9093
+---
+# Basic auth secret for monitoring access
+apiVersion: v1
+kind: Secret
+metadata:
+  name: monitoring-auth
+  namespace: qdrant-neo4j-crawl4ai-mcp
+  labels:
+    app.kubernetes.io/name: monitoring
+    app.kubernetes.io/instance: qdrant-neo4j-crawl4ai-mcp
+    app.kubernetes.io/component: auth
+type: Opaque
+data:
+  # admin:$2y$10$... (password: CHANGE_ME_IN_PRODUCTION)
+  # Generate with: htpasswd -nb admin password | base64 -w0
+  auth: YWRtaW46JGFwcjEkLkdIZTJKTnkkc2pCWWZzM2Y4dVhPQ0Q0eFFKSHJSTQo=
